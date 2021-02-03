@@ -1,0 +1,50 @@
+version: '3.7'
+
+################################################################################
+# NETWORKING CONFIGURATION
+################################################################################
+
+networks:
+
+    traefik:
+        external:
+            name: traefik_reverse-proxy
+
+################################################################################
+# SERVICES CONFIGURATION
+################################################################################
+
+services:
+
+    ####################################
+    # HOSTED JUPYTER NOTEBOOK
+    ####################################
+
+    pihole:
+        container_name: pihole
+        image:          pihole/pihole:latest
+        restart:        ${UNIVERSAL_RESTART_POLICY}
+        environment:
+            TZ:          ${TZ}
+            WEBPASSWORD: ${ADMIN_PASSWORD}
+            DNS1:        8.8.8.8
+            DNS2:        8.8.4.4
+        volumes:
+            - ${DOCKER_DIRECTORY}/config/etc-pihole/:/etc/pihole/
+            - ${DOCKER_DIRECTORY}/config/etc-dnsmasq.d/:/etc/dnsmasq.d/
+        networks:
+            traefik: null
+        ports:
+            - "53:53/tcp"
+            - "53:53/udp"
+            - "67:67/udp"
+        cap_add:
+            - NET_ADMIN
+        labels:
+            traefik.enable:                                            true
+            traefik.http.routers.pihole-rtr.rule:                      Host(`${PIHOLE_SUBDOMAIN}.${DOMAIN_NAME}`)
+            traefik.http.routers.pihole-rtr.service:                   pihole-svc
+            traefik.http.services.pihole-svc.loadbalancer.server.port: 80
+            traefik.http.routers.jupyter-rtr.entrypoints:              https
+            traefik.http.routers.jupyter-rtr.middlewares:              chain-oauth-google@file
+
